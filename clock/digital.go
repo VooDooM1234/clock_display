@@ -36,16 +36,11 @@ type SevenSegmentDisplay struct {
 
 type DigitalClock struct {
 	SevenSegmentDisplay *SevenSegmentDisplay
-	ClockFace           fyne.CanvasObject
-	digits              []fyne.CanvasObject
+	ClockFace           *fyne.Container
+	digits              []*fyne.Container
 	digitWidth          int
 	digitSpacing        int
-	HrOnesDigit         int
-	HrTensDigit         int
-	MinOnesDigit        int
-	MinTensDigit        int
-	SecOnesDigit        int
-	SecTensDigit        int
+	mode24hr            bool
 }
 
 func NewSevenSegmentDisplay(onColor, offColor, strokeColor color.Color) *SevenSegmentDisplay {
@@ -63,50 +58,51 @@ func NewSevenSegmentDisplay(onColor, offColor, strokeColor color.Color) *SevenSe
 	}
 }
 
-func NewDigitalClock(onColor, offColor, strokeColor color.Color, digitalWidth, digitalSpacing int) *DigitalClock {
+func NewDigitalClock(mode24hr bool, onColor, offColor, strokeColor color.Color, digitalWidth, digitalSpacing int) *DigitalClock {
 	time := NewTickData()
 
 	ssd := NewSevenSegmentDisplay(onColor, offColor, strokeColor)
-	ssd.SegmentShapes = newDigitalSegmentShapes()
-	ssd.Segments = newDigitalSegmentBoolMap().Segments
-	ssd.onColor = onColor
-	ssd.offColor = offColor
-	ssd.strokeColor = strokeColor
 
-	HrOnesDigit := ssd.drawDigit(time.HrOnesDigit)
-	HrTensDigit := ssd.drawDigit(time.HrTensDigit)
-	MinOnesDigit := ssd.drawDigit(time.MinOnesDigit)
-	MinTensDigit := ssd.drawDigit(time.MinTensDigit)
-	SecOnesDigit := ssd.drawDigit(time.SecOnesDigit)
-	SecTensDigit := ssd.drawDigit(time.SecTensDigit)
+	HrTensDigit, HrOnesDigit := 0, 0
 
-	digits := []fyne.CanvasObject{
-		HrTensDigit,
-		HrOnesDigit,
-		MinTensDigit,
-		MinOnesDigit,
-		SecTensDigit,
-		SecOnesDigit,
+	if mode24hr {
+		HrTensDigit = time.Hr24TensDigit
+		HrOnesDigit = time.Hr24OnesDigit
+	} else {
+		HrTensDigit = time.Hr12TensDigit
+		HrOnesDigit = time.Hr12OnesDigit
 	}
 
-	for i, digitObj := range digits {
+	colon1 := drawColon(onColor)
+	colon2 := drawColon(onColor)
+
+	digitsContainer := []*fyne.Container{
+		ssd.drawDigit(HrTensDigit),
+		ssd.drawDigit(HrOnesDigit),
+		container.NewWithoutLayout(colon1),
+		ssd.drawDigit(time.MinTensDigit),
+		ssd.drawDigit(time.MinOnesDigit),
+		container.NewWithoutLayout(colon2),
+		ssd.drawDigit(time.SecTensDigit),
+		ssd.drawDigit(time.SecOnesDigit),
+	}
+
+	for i, digitObj := range digitsContainer {
 		digitObj.Move(fyne.NewPos(float32(i*(digitalWidth+digitalSpacing)), 0))
 	}
 
-	ClockFace := container.NewWithoutLayout(digits...)
+	ClockFace := container.NewWithoutLayout()
+	for _, digit := range digitsContainer {
+		ClockFace.Add(digit)
+	}
 
 	return &DigitalClock{
 		ClockFace:           ClockFace,
-		digits:              digits,
-		SevenSegmentDisplay: NewSevenSegmentDisplay(onColor, offColor, strokeColor),
+		digits:              digitsContainer,
+		SevenSegmentDisplay: ssd,
 		digitWidth:          digitalWidth,
 		digitSpacing:        digitalSpacing,
-		HrOnesDigit:         0,
-		HrTensDigit:         0,
-		MinOnesDigit:        0,
-		MinTensDigit:        0,
-		SecOnesDigit:        0,
-		SecTensDigit:        0,
+		mode24hr:            mode24hr,
 	}
 }
 
@@ -162,7 +158,7 @@ func newDigitalSegmentBoolMap() *SevenSegmentDisplay {
 	}
 }
 
-func (ssd *SevenSegmentDisplay) drawDigit(digit int) fyne.CanvasObject {
+func (ssd *SevenSegmentDisplay) drawDigit(digit int) *fyne.Container {
 	segments := []fyne.CanvasObject{}
 
 	for i, seg := range ssd.SegmentShapes {
@@ -187,28 +183,48 @@ func (ssd *SevenSegmentDisplay) drawDigit(digit int) fyne.CanvasObject {
 	return container.NewWithoutLayout(segments...)
 }
 
+func drawColon(onColor color.Color) *fyne.Container {
+	topDot := canvas.NewRectangle(onColor)
+	topDot.Resize(fyne.NewSize(10, 10))
+
+	bottomDot := canvas.NewRectangle(onColor)
+	bottomDot.Resize(fyne.NewSize(10, 10))
+
+	colon := container.NewWithoutLayout(topDot, bottomDot)
+	topDot.Move(fyne.NewPos(0, 20))
+	bottomDot.Move(fyne.NewPos(0, 60))
+
+	return colon
+}
+
 func (d *DigitalClock) Update(t *TickData) {
 
-	digitObjects := []fyne.CanvasObject{
-		d.SevenSegmentDisplay.drawDigit(t.HrTensDigit),
-		d.SevenSegmentDisplay.drawDigit(t.HrOnesDigit),
+	HrTensDigit, HrOnesDigit := 0, 0
+
+	if d.mode24hr {
+		HrTensDigit = t.Hr24TensDigit
+		HrOnesDigit = t.Hr24OnesDigit
+	} else {
+		HrTensDigit = t.Hr12TensDigit
+		HrOnesDigit = t.Hr12OnesDigit
+	}
+
+	newDigits := []*fyne.Container{
+		d.SevenSegmentDisplay.drawDigit(HrTensDigit),
+		d.SevenSegmentDisplay.drawDigit(HrOnesDigit),
 		d.SevenSegmentDisplay.drawDigit(t.MinTensDigit),
 		d.SevenSegmentDisplay.drawDigit(t.MinOnesDigit),
 		d.SevenSegmentDisplay.drawDigit(t.SecTensDigit),
 		d.SevenSegmentDisplay.drawDigit(t.SecOnesDigit),
 	}
 
-	for i, newDigit := range digitObjects {
-		existingContainer := d.digits[i].(*fyne.Container)
-
-		// Clear old children
-		existingContainer.Objects = nil
-
-		// Add new children one by one
-		newDigitContainer := newDigit.(*fyne.Container)
-		for _, obj := range newDigitContainer.Objects {
-			existingContainer.Add(obj)
+	// Update only digit Containers (skip colon Containers)
+	digitIndex := 0
+	for _, obj := range d.ClockFace.Objects {
+		if container, ok := obj.(*fyne.Container); ok && len(container.Objects) == 7 {
+			container.Objects = newDigits[digitIndex].Objects
+			container.Refresh()
+			digitIndex++
 		}
-		existingContainer.Refresh()
 	}
 }
