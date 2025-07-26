@@ -11,13 +11,12 @@ import (
 )
 
 type AnalogClock struct {
-	HourHand   *canvas.Line
-	MinuteHand *canvas.Line
-	SecondHand *canvas.Line
-	ClockFace  fyne.CanvasObject
-	cx, cy     int
-	radius     int
-
+	HourHand    *canvas.Line
+	MinuteHand  *canvas.Line
+	SecondHand  *canvas.Line
+	ClockFace   fyne.CanvasObject
+	cx, cy      int
+	radius      int
 	HourAngle   float64
 	MinuteAngle float64
 	SecondAngle float64
@@ -103,7 +102,6 @@ func drawClockHand(cx int, cy int, x int, y int, handColor color.Color) *canvas.
 	hand.StrokeWidth = 2
 	hand.Position1 = fyne.NewPos(float32(cx), float32(cy))
 	hand.Position2 = fyne.NewPos(float32(x), float32(y))
-	hand.Refresh()
 	return hand
 }
 
@@ -125,13 +123,9 @@ func updateHand(hand *canvas.Line, cx int, cy int, radius int, angle float64) {
 	canvas.Refresh(hand)
 }
 
-func (a *AnalogClock) updateHands() {
+func (a *AnalogClock) Update(t *TickData) {
+	a.HourAngle, a.MinuteAngle, a.SecondAngle = getClockHandAngles(t)
 	updateHand(a.HourHand, a.cx, a.cy, a.radius, a.HourAngle)
 	updateHand(a.MinuteHand, a.cx, a.cy, a.radius, a.MinuteAngle)
 	updateHand(a.SecondHand, a.cx, a.cy, a.radius, a.SecondAngle)
-}
-
-func (a *AnalogClock) Update(t *TickData) {
-	a.HourAngle, a.MinuteAngle, a.SecondAngle = getClockHandAngles(t)
-	a.updateHands()
 }
