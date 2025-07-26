@@ -87,8 +87,19 @@ func NewDigitalClock(mode24hr bool, onColor, offColor, strokeColor color.Color, 
 		ssd.drawDigit(time.SecOnesDigit),
 	}
 
+	x := float32(0)
 	for i, digitObj := range digitsContainer {
-		digitObj.Move(fyne.NewPos(float32(i*(digitalWidth+digitalSpacing)), 0))
+		var w float32
+		if i == 2 || i == 5 {
+			w = float32(digitalWidth) * 0.2 // or set a colonWidth variable
+		} else {
+			w = float32(digitalWidth)
+		}
+
+		digitObj.Resize(fyne.NewSize(w, digitObj.Size().Height))
+		digitObj.Move(fyne.NewPos(x, 0))
+
+		x += w + float32(digitalSpacing)
 	}
 
 	ClockFace := container.NewWithoutLayout()
@@ -218,10 +229,11 @@ func (d *DigitalClock) Update(t *TickData) {
 		d.SevenSegmentDisplay.drawDigit(t.SecOnesDigit),
 	}
 
-	// Update only digit Containers (skip colon Containers)
+	// Only refresh digits
 	digitIndex := 0
 	for _, obj := range d.ClockFace.Objects {
-		if container, ok := obj.(*fyne.Container); ok && len(container.Objects) == 7 {
+		container, ok := obj.(*fyne.Container)
+		if ok && len(container.Objects) == 7 {
 			container.Objects = newDigits[digitIndex].Objects
 			container.Refresh()
 			digitIndex++
